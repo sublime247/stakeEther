@@ -1,13 +1,11 @@
-# Sample Hardhat Project
+# Staking Smart Contract 
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a Hardhat Ignition module that deploys that contract.
+This is a simple staking smart contract that allows users to stake their tokens and earn rewards.
+Their rewards are calculated based on the amount of time they have staked their tokens.
 
-Try running some of the following tasks:
+TOKENS WAS CREATED USING THE ERC20 STANDARD
+Both stakingEther and stakeToken function are implemented in the smart contract.
 
-```shell
-npx hardhat help
-npx hardhat test
-REPORT_GAS=true npx hardhat test
-npx hardhat node
-npx hardhat ignition deploy ./ignition/modules/Lock.ts
-```
+Deployed and verify on LISK_SEPOLIA Testnet.
+
+

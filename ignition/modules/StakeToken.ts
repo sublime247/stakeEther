@@ -15,3 +15,4 @@ export default StakeTokenModule;
 // Deployed contract address
 // 0xd3f137bea0585FB5003B3425E340FCe4503448ea
 
+
