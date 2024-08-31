@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.24;
 
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract StakingContact{
+
+
+
+contract StakeToken{
     address owner;
-     enum Duration {
+    address tokenAddress;
+         enum Duration {
         ONEMONTH,
         TWOMONTH,
         THREEMONTH,
@@ -25,8 +30,10 @@ contract StakingContact{
     // staking profit rate
     uint256 public constant MONTHLY_RATE = 5;
     uint256 public constant YEARLY=60;
-    constructor(){
+
+    constructor(address _tokenAddress){
       owner= msg.sender;
+      tokenAddress=_tokenAddress;
     }
   error NotOwner();
 event Deposited(address indexed _address, Duration _duration, uint balance);
@@ -39,18 +46,22 @@ function onlyOwner() view private {
     }
 }
 
-function deposit(Duration _duration) external payable{
+function stakeToken(Duration _duration, uint256 _amount) external payable{
     require(_duration == Duration.ONEMONTH ||
             _duration == Duration.THREEMONTH ||
              _duration == Duration.TWOMONTH || 
              _duration == Duration.ONEYEAR, 
              "Enter a valid Duration");
+
+ uint256 _userTokenBalance = IERC20(tokenAddress).balanceOf(msg.sender);
+ require(_userTokenBalance>=_amount, "You dont have sufficient Token to stake");
    User storage user = users[msg.sender];
    require(user.hasStaked==false, "You can't stake twice");
+   IERC20(tokenAddress).transferFrom(msg.sender, address(this), _amount);
    user._startTime= block.timestamp;
    user.hasStaked=true;
-   user.balance = msg.value;
    user.duration = _duration;
+   user.balance = msg.value;
 
 
    
@@ -89,8 +100,11 @@ return stakingReward;
 
 function withdrawStaking() external  {
 User storage _user = users[msg.sender];
+
 require(_user.hasStaked ==true, "You have no stake");
+
 uint256 stakeEndtime;
+
 if(_user.duration==Duration.ONEMONTH){
   stakeEndtime = _user._startTime+ 30 *1 days;
 
@@ -108,16 +122,18 @@ if(_user.duration==Duration.ONEYEAR){
 
 }
 
+
+
+
 uint reward = rewardMechanism(_user);
 require(block.timestamp>=_user._startTime, "You can't withdraw your stake yet");
+
 uint256 totalReward = _user.balance + reward;
 
-_user.balance =0;
+_user.balance = 0;
 _user.hasStaked= false;
 
-
-(bool success, ) = msg.sender.call{value: totalReward}("");
-require(success, "Transaction Error");
+IERC20(tokenAddress).transfer(msg.sender, totalReward);
 
 emit WithDrawalSucessful(msg.sender, totalReward);
 
