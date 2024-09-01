@@ -1,127 +1,96 @@
-// import {
-//   time,
-//   loadFixture,
-// } from "@nomicfoundation/hardhat-toolbox/network-helpers";
-// import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
-// import { expect } from "chai";
-// import hre from "hardhat";
+import {
+  time,
+  loadFixture,
+} from "@nomicfoundation/hardhat-toolbox/network-helpers";
+import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
+import { expect } from "chai";
+import hre, { ethers } from "hardhat";
+// import { StakeEther__factory } from "../typechain-types";
 
-// describe("Lock", function () {
-//   // We define a fixture to reuse the same setup in every test.
-//   // We use loadFixture to run this setup once, snapshot that state,
-//   // and reset Hardhat Network to that snapshot in every test.
-//   async function deployOneYearLockFixture() {
-//     const ONE_YEAR_IN_SECS = 365 * 24 * 60 * 60;
-//     const ONE_GWEI = 1_000_000_000;
+describe("StakeEther", function () {
 
-//     const lockedAmount = ONE_GWEI;
-//     const unlockTime = (await time.latest()) + ONE_YEAR_IN_SECS;
+  async function deployStakeEther() {
+    const [owner, otherAccount] = await hre.ethers.getSigners();
+    const contractFactory = await hre.ethers.getContractFactory("StakeEther")
+    const stakeEther = await contractFactory.deploy();
+    return { stakeEther, owner, otherAccount }
+  }
 
-//     // Contracts are deployed using the first signer/account by default
-//     const [owner, otherAccount] = await hre.ethers.getSigners();
+  describe("Staking", function () {
+    it("Should deposit successfully", async function () {
 
-//     const Lock = await hre.ethers.getContractFactory("Lock");
-//     const lock = await Lock.deploy(unlockTime, { value: lockedAmount });
+      const { stakeEther, owner } = await loadFixture(deployStakeEther);
+      
+      const trfAmount = ethers.parseEther("10",);
+      
+      expect(await stakeEther.stakeEther(0, { value: trfAmount }))
+        .to.emit(stakeEther, "Deposited")
+        .withArgs(owner.address, 0, trfAmount);
 
-//     return { lock, unlockTime, lockedAmount, owner, otherAccount };
-//   }
+      const user = await stakeEther.users(owner.address);
+      expect(user.balance).to.equal(trfAmount);
+      expect(user.hasStaked).to.equal(true);
+      expect(user.duration).to.equal(0);
+    });
 
-//   describe("Deployment", function () {
-//     it("Should set the right unlockTime", async function () {
-//       const { lock, unlockTime } = await loadFixture(deployOneYearLockFixture);
 
-//       expect(await lock.unlockTime()).to.equal(unlockTime);
-//     });
+    it("Should not allow staking twice", async function () {
+      
+      const { stakeEther, } = await loadFixture(deployStakeEther);
+      const trfAmount = ethers.parseEther("10",);
 
-//     it("Should set the right owner", async function () {
-//       const { lock, owner } = await loadFixture(deployOneYearLockFixture);
+      await expect(stakeEther.stakeEther(0, { value: trfAmount }));
 
-//       expect(await lock.owner()).to.equal(owner.address);
-//     });
+      await expect(stakeEther.stakeEther(0, { value: trfAmount })).to.be.revertedWith("You can't stake twice");
+      
 
-//     it("Should receive and store the funds to lock", async function () {
-//       const { lock, lockedAmount } = await loadFixture(
-//         deployOneYearLockFixture
-//       );
+    });
+    it("Should not allow invalid duration", async function () {
+      const { stakeEther, } = await loadFixture(deployStakeEther);
+      const trfAmount = ethers.parseEther("10",);
+      // const duration = 4;
+      await expect(stakeEther.stakeEther(4, { value: trfAmount }));
+      await expect(stakeEther.stakeEther(4, { value: trfAmount })).to.be.revertedWith("Invalid Duration Enum Value");
 
-//       expect(await hre.ethers.provider.getBalance(lock.target)).to.equal(
-//         lockedAmount
-//       );
-//     });
+    });
+  });
 
-//     it("Should fail if the unlockTime is not in the future", async function () {
-//       // We don't use the fixture here because we want a different deployment
-//       const latestTime = await time.latest();
-//       const Lock = await hre.ethers.getContractFactory("Lock");
-//       await expect(Lock.deploy(latestTime, { value: 1 })).to.be.revertedWith(
-//         "Unlock time should be in the future"
-//       );
-//     });
-//   });
 
-//   describe("Withdrawals", function () {
-//     describe("Validations", function () {
-//       it("Should revert with the right error if called too soon", async function () {
-//         const { lock } = await loadFixture(deployOneYearLockFixture);
 
-//         await expect(lock.withdraw()).to.be.revertedWith(
-//           "You can't withdraw yet"
-//         );
-//       });
+  describe("withdrawStaking", function () {
+    it("Should check if user has a Stake", async function () {
+      const { stakeEther, owner } = await loadFixture(deployStakeEther);
+      const trfAmount = ethers.parseEther("10",);
+      // Attempting to withdraw without staking first
+      await expect(stakeEther.withdrawStaking())
+        .to.be.revertedWith("You have no stake");
 
-//       it("Should revert with the right error if called from another account", async function () {
-//         const { lock, unlockTime, otherAccount } = await loadFixture(
-//           deployOneYearLockFixture
-//         );
+    });
+    it("Should check Duration has not reached", async function () {
+      const { stakeEther, owner } = await loadFixture(deployStakeEther);
+      const trfAmount = ethers.parseEther("10",);
+      await expect(stakeEther.stakeEther(0, { value: trfAmount }));
+      // Attempting to withdraw without staking first
+      await expect(stakeEther.withdrawStaking())
+        .to.be.revertedWith("You have no stake");
 
-//         // We can increase the time in Hardhat Network
-//         await time.increaseTo(unlockTime);
+    });
 
-//         // We use lock.connect() to send a transaction from another account
-//         await expect(lock.connect(otherAccount).withdraw()).to.be.revertedWith(
-//           "You aren't the owner"
-//         );
-//       });
 
-//       it("Shouldn't fail if the unlockTime has arrived and the owner calls it", async function () {
-//         const { lock, unlockTime } = await loadFixture(
-//           deployOneYearLockFixture
-//         );
+    // it("Should check if Duration has reached", async function () {
+    //   const { stakeEther, owner } = await loadFixture(deployStakeEther);
+    //   const trfAmount = ethers.parseEther("5",);
+    //   await stakeEther.stakeEther(0, { value: trfAmount });
+    //   await time.increase(30 * 24 * 60 * 60);
+    //   await expect(stakeEther.withdrawStaking())
+    //     .to.emit(stakeEther, "withdrawal successful!")
+    //     .withArgs(owner.address, trfAmount);
+    //     const user = await stakeEther.users(owner.address);
+    //   expect(user.balance).to.equal(0);
+    //   expect(user.hasStaked).to.equal(false);
 
-//         // Transactions are sent using the first signer by default
-//         await time.increaseTo(unlockTime);
+    // });
 
-//         await expect(lock.withdraw()).not.to.be.reverted;
-//       });
-//     });
 
-//     describe("Events", function () {
-//       it("Should emit an event on withdrawals", async function () {
-//         const { lock, unlockTime, lockedAmount } = await loadFixture(
-//           deployOneYearLockFixture
-//         );
-
-//         await time.increaseTo(unlockTime);
-
-//         await expect(lock.withdraw())
-//           .to.emit(lock, "Withdrawal")
-//           .withArgs(lockedAmount, anyValue); // We accept any value as `when` arg
-//       });
-//     });
-
-//     describe("Transfers", function () {
-//       it("Should transfer the funds to the owner", async function () {
-//         const { lock, unlockTime, lockedAmount, owner } = await loadFixture(
-//           deployOneYearLockFixture
-//         );
-
-//         await time.increaseTo(unlockTime);
-
-//         await expect(lock.withdraw()).to.changeEtherBalances(
-//           [owner, lock],
-//           [lockedAmount, -lockedAmount]
-//         );
-//       });
-//     });
-//   });
-// });
+})
+});

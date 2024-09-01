@@ -21,7 +21,7 @@ contract StakeEther{
 
      }
 
-    mapping(address=> User) users;
+    mapping(address=> User) public users;
     // staking profit rate
     uint256 public constant MONTHLY_RATE = 5;
     uint256 public constant YEARLY=60;
@@ -39,25 +39,23 @@ function onlyOwner() view private {
     }
 }
 
-function stakeEther(Duration _duration) external payable{
-    require(_duration == Duration.ONEMONTH ||
-            _duration == Duration.THREEMONTH ||
-             _duration == Duration.TWOMONTH || 
-             _duration == Duration.ONEYEAR, 
-             "Enter a valid Duration");
-   User storage user = users[msg.sender];
-   require(user.hasStaked==false, "You can't stake twice");
-   user._startTime= block.timestamp;
-   user.hasStaked=true;
-   user.balance = msg.value;
-   user.duration = _duration;
+function stakeEther(uint _duration) external payable {
+    require(msg.sender != address(0), "Address zero detected");
+    require(_duration <= uint(Duration.ONEYEAR), "Invalid Duration Enum Value");
 
+    Duration durationEnum = Duration(_duration);  // Convert the validated integer to the enum
 
-   
-   emit Deposited(msg.sender, _duration, user.balance);
- 
-  
+    User storage user = users[msg.sender];
+    require(user.hasStaked == false, "You can't stake twice");
+
+    user._startTime = block.timestamp;
+    user.hasStaked = true;
+    user.balance = msg.value;
+    user.duration = durationEnum;
+
+    emit Deposited(msg.sender, durationEnum, user.balance);
 }
+
 
 
 function rewardMechanism(User memory _user) private view returns(uint256){
@@ -93,7 +91,6 @@ require(_user.hasStaked ==true, "You have no stake");
 uint256 stakeEndtime;
 if(_user.duration==Duration.ONEMONTH){
   stakeEndtime = _user._startTime+ 30 *1 days;
-
 }
 if(_user.duration==Duration.TWOMONTH){
   stakeEndtime = _user._startTime+ 90 *1 days;
@@ -108,8 +105,8 @@ if(_user.duration==Duration.ONEYEAR){
 
 }
 
+require(block.timestamp>=stakeEndtime, "You can't withdraw your stake yet");
 uint reward = rewardMechanism(_user);
-require(block.timestamp>=_user._startTime, "You can't withdraw your stake yet");
 uint256 totalReward = _user.balance + reward;
 
 _user.balance =0;
